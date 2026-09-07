@@ -50,7 +50,15 @@ export interface SelectionVerificationStep {
 
 export interface SelectionPreview {
   clientRequestId: string;
-  exactTarget: { courseId: string; rwh?: string };
+  exactTarget: {
+    courseId: string;
+    rwh?: string;
+    semester: string;
+    cultivation: "1" | "2";
+    round: string;
+    bid: number;
+    where: SelectionBidWhere;
+  };
   operation: SelectionOperation;
   endpoint: string;
   payload: Record<string, string | number | string[]>;
@@ -167,7 +175,15 @@ export function buildSelectionPreview(context: SelectionContext, input: Selectio
   const payload = buildSelectionPayload(context, input);
   return {
     clientRequestId: input.clientRequestId?.trim() || randomUUID(),
-    exactTarget: { courseId:input.courseId, ...(input.rwh?.trim() ? { rwh:input.rwh.trim() } : {}) },
+    exactTarget: {
+      courseId: input.courseId,
+      ...(input.rwh?.trim() ? { rwh: input.rwh.trim() } : {}),
+      semester: context.semester.value,
+      cultivation: context.cultivation,
+      round: stringValue(payload.p_xkfsdm),
+      bid: input.bid ?? 1,
+      where: input.where ?? "enrolled",
+    },
     operation: input.operation,
     endpoint,
     payload,
@@ -394,6 +410,9 @@ export function verifySelectionWrite(
   target: SelectionApplyTarget,
 ): SelectionVerificationResult {
   const observation = observeSelectionState(state, target);
+  if (!observation.roundCode || observation.roundCode !== target.round) {
+    return { status: "not_observed", message: "Read-back did not establish the requested selection round.", observation };
+  }
   if (target.operation === "cart.add") {
     const cart = observation.cart;
     if (!cart) return { status: "not_observed", message: "The exact RWH was not observed in cart after the write.", observation };
@@ -480,6 +499,9 @@ function classifyReconciliationState(
   target: SelectionApplyTarget,
 ): { state: "desired" | "inverse" | "conflicting"; message: string } {
   const observation = observeSelectionState(state, target);
+  if (!observation.roundCode || observation.roundCode !== target.round) {
+    return { state: "conflicting", message: "Read-back did not establish the requested selection round." };
+  }
   const candidates = [observation.cart, observation.enrolled].filter((entry) => entry !== undefined);
   if (candidates.some((entry) => entry.courseIdObserved && !entry.courseIdMatches)) {
     return { state: "conflicting", message: "The RWH was observed with a different course ID." };
@@ -496,6 +518,9 @@ function classifyReconciliationState(
         : target.where === "cart"
           ? observation.cart
           : observation.enrolled;
+  if (target.operation === "bid.update" && exact?.bid === undefined) {
+    return { state: "conflicting", message: "Read-back omitted the bid value needed to establish the final state." };
+  }
   if (exact?.courseIdMatches || (!exact && (target.operation === "cart.add" || target.operation === "enroll"))) {
     return { state: "inverse", message: verification.message };
   }

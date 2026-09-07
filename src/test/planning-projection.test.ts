@@ -9,6 +9,23 @@ import {
 } from "../tis/planning-projection.js";
 import type { TisDegreeMissing } from "../tis/degree-missing.js";
 import type { TisDegreeProgress } from "../tis/degree-progress.js";
+import { normalisePersonalScheduleEntry } from "../tis/normalise.js";
+
+test("SKSJ-only enrollment retains teaching and meeting fields through the planning projection", () => {
+  const source = {
+    KCDM: "CS101", RWH: "task-1", KEY: "xq3_jc7",
+    SKSJ: "Synthetic course\n[Example Teacher]\n[Section A]\n[1-3周][Room 101][7-8节]",
+  };
+  const result = projectEnrollmentForPlanning([normalisePersonalScheduleEntry(source)])[0]!;
+  assert.deepEqual(result.teachingTeam, ["Example Teacher"]);
+  assert.deepEqual(result.meetings, [{ day: 3, periodStart: 7, periodEnd: 8, weeks: [1, 2, 3], room: "Room 101" }]);
+  assert.equal("description" in result, false);
+  const explicit = normalisePersonalScheduleEntry({ ...source, SKJS: "Explicit Teacher", SKDD: "Room 202", ZC: "00101", KSJC: 1, JSJC: 2 });
+  assert.equal(explicit.teacher, "Explicit Teacher");
+  assert.equal(explicit.room, "Room 202");
+  assert.deepEqual(explicit.weeks, [2, 4]);
+  assert.equal(explicit.periodEnd, 2);
+});
 
 test("planning degree projections are grade-free unless details were explicit", () => {
   const progress = {

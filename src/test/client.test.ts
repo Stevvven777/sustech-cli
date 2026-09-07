@@ -67,6 +67,9 @@ test("selection mutation transport failures distinguish known pre-send failure f
     operation:"cart.add",
     courseId:"selection-id",
     rwh:"task-id",
+    round:"bxxk",
+    bid:5,
+    where:"cart",
     clientRequestId:"00000000-0000-4000-8000-000000000001",
   });
   const beforeSend = new TisClient({
@@ -94,7 +97,11 @@ test("selection mutation transport failures distinguish known pre-send failure f
       && error.exitCode === 5
       && error.details?.warning === "DO_NOT_RETRY_AUTOMATICALLY"
       && (error.details.target as { clientRequestId?: string; rwh?: string })?.clientRequestId === preview.clientRequestId
-      && (error.details.target as { rwh?: string })?.rwh === "task-id",
+      && (error.details.target as { rwh?: string })?.rwh === "task-id"
+      && (error.details.target as { round?: string })?.round === "bxxk"
+      && (error.details.target as { bid?: number })?.bid === 5
+      && (error.details.target as { semester?: string })?.semester === SEMESTER.value
+      && (error.details.target as { where?: string })?.where === "cart",
   );
 });
 

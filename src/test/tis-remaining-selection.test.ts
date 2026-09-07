@@ -92,6 +92,24 @@ test("bid planning short-circuits when the round budget would be exceeded", () =
   assert.equal(plan.previews.length, 0);
 });
 
+test("reconciliation requires matching round evidence for every operation", () => {
+  for (const operation of ["cart.add", "cart.remove", "enroll", "drop", "bid.update"] as const) {
+    const target = { operation, courseId: "hex-id", rwh: "RWH-1", round: "bxxk", bid: 5, where: "cart" as const };
+    for (const round of [{ xkfsdm: "yixuan" }, {}]) {
+      const entries = [{ id: "hex-id", rwh: "RWH-1", xkxs: "5" }];
+      const state = { cart: entries, enrolled: entries, round };
+      assert.equal(reconcileSelectionSnapshots([state, structuredClone(state)], target).status, "still_uncertain");
+      assert.equal(verifySelectionWrite(state, target).status, "not_observed");
+    }
+  }
+});
+
+test("a missing bid value cannot establish the inverse mutation state", () => {
+  const target = { operation: "bid.update" as const, courseId: "hex-id", rwh: "RWH-1", round: "bxxk", bid: 5, where: "cart" as const };
+  const state = { cart: [{ id: "hex-id", rwh: "RWH-1" }], enrolled: [], round: { xkfsdm: "bxxk" } };
+  assert.equal(reconcileSelectionSnapshots([state, state], target).status, "still_uncertain");
+});
+
 test("bid planning validates per-course bids before generating previews", () => {
   const plan = planBidUpdates(CONTEXT, { A: 0, B: 2 }, { where: "enrolled", round: "yixuan" });
   assert.deepEqual(plan.errors, ["A: bid must be >= 1"]);

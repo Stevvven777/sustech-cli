@@ -70,10 +70,14 @@ export function bundleSelectionCourses(courses: readonly Course[]): SelectionCou
 function buildBundle(bundleId: string, rows: readonly Course[]): SelectionCourseBundle {
   const warnings: string[] = [];
   const byComponent = new Map<string, Course>();
+  let duplicateCreditConflict = false;
   for (const course of [...rows].sort(componentOrder)) {
     const componentId = course.selection?.componentId ?? course.rwh;
     const existing = byComponent.get(componentId);
     if (existing) {
+      if (existing.credits !== course.credits || existing.selection?.creditBearing !== course.selection?.creditBearing) {
+        duplicateCreditConflict = true;
+      }
       warnings.push(`Duplicate source row for component ${componentId} was merged.`);
       byComponent.set(componentId, {
         ...existing,
@@ -85,10 +89,12 @@ function buildBundle(bundleId: string, rows: readonly Course[]): SelectionCourse
     byComponent.set(componentId, course);
   }
   const ordered = [...byComponent.values()].sort(componentOrder);
-  const identities = new Set(ordered.map((course) => `${course.code.trim().toUpperCase()}\u0000${course.name.trim()}`));
+  const identities = new Set(rows.map((course) => `${course.code.trim().toUpperCase()}\u0000${course.name.trim()}`));
   if (identities.size > 1) warnings.push("Bundle source rows disagree on course identity; manual review is required.");
 
-  const credit = resolveCreditCarrier(ordered);
+  const credit: ReturnType<typeof resolveCreditCarrier> = duplicateCreditConflict
+    ? { status: "ambiguous" }
+    : resolveCreditCarrier(ordered);
   if (credit.status === "ambiguous") warnings.push("Bundle source rows disagree on credits; no credit value was projected.");
   const components = ordered.map((course, index): SelectionCourseComponent => ({
     componentId: course.selection?.componentId ?? course.rwh,
@@ -116,8 +122,12 @@ function buildBundle(bundleId: string, rows: readonly Course[]): SelectionCourse
   }));
   const requiredComponents = components.filter((component) => component.required);
   const selectableWithoutGuessing = requiredComponents.length > 0
+    && credit.status !== "ambiguous"
+    && identities.size === 1
     && requiredComponents.every((component) => Boolean(component.mutationCourseId && component.taskId));
-  if (!selectableWithoutGuessing) warnings.push("At least one required component lacks an explicit mutation courseId/task rwh pair.");
+  if (!requiredComponents.length || requiredComponents.some((component) => !component.mutationCourseId || !component.taskId)) {
+    warnings.push("At least one required component lacks an explicit mutation courseId/task rwh pair.");
+  }
 
   return {
     schemaVersion: "1",

@@ -11,7 +11,7 @@ The selection surface separates catalog rows, selectable bundles, mutation ident
 - `credits` and `creditStatus`: equal repeated component credits are counted once. Conflicting component credits produce `creditStatus: "ambiguous"` and omit `credits` instead of guessing or summing.
 - `teachingTeam` and `meetings`: unions across all components, retaining parity-week schedules.
 - `operationTargets`: exact component-level mutation `courseId`, task `rwh`, payload field, and read-back identity.
-- `selectableWithoutGuessing`: true only when every required component has the explicit identifier pair needed for mutation and verification.
+- `selectableWithoutGuessing`: true only when every required component has the explicit identifier pair needed for mutation and verification, and source course identity and credit evidence do not conflict.
 
 Duplicate source rows for the same component are merged and reported in `warnings`. Default CLI output never contains the upstream selection envelope, enrolled/cart raw rows, credentials, cookies, tokens, or unrelated student fields. `retainCourseSourceRecord` is a library-level diagnostics-only escape hatch and is not called by CLI commands.
 
@@ -44,7 +44,7 @@ Reconciliation performs two to five bounded read-only queries and reports:
 
 - `applied`: the final bounded observation reached the requested exact state;
 - `not_applied`: at least two consistent exact observations retained the inverse state and no desired/conflicting observation appeared;
-- `still_uncertain`: a query failed, identifiers conflicted, observations regressed, or evidence remained incomplete.
+- `still_uncertain`: a query failed, identifiers conflicted, round metadata was missing or mismatched, observations regressed, or evidence remained incomplete (including a missing bid value).
 
 None of these states authorizes an automatic mutation retry. `not_applied` means a human or higher-level workflow may review a new preview; it does not reuse the uncertain request.
 

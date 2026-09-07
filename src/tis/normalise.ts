@@ -109,8 +109,16 @@ export function normalisePersonalScheduleEntry(raw: Record<string, unknown>): Pe
   const keyMatch = /^xq(\d+)_jc(\d+)/i.exec(key);
   const weekBitmap = firstString(raw, ["ZC", "zc"]);
   const description = firstString(raw, ["SKSJ", "sksj"]);
-  const periodStart = numberValue(raw.KSJC ?? raw.ksjc) ?? (keyMatch ? Number(keyMatch[2]) : undefined);
-  const periodEnd = numberValue(raw.JSJC ?? raw.jsjc) ?? periodStart;
+  const descriptionLines = description.split(/\r?\n/).map((line) => line.trim());
+  const descriptionTeacher = /^\[([^\[\]]+)\]$/.exec(descriptionLines[1] ?? "")?.[1] ?? "";
+  const descriptionMeeting = /\[([\d,，、\s-]+)(单|双)?周\]\s*\[([^\[\]]*)\]\s*\[(\d+)(?:-(\d+))?节\]/.exec(description);
+  let descriptionWeeks = descriptionMeeting ? expandWeeks(descriptionMeeting[1].replace(/[，、]/g, ",")) : [];
+  if (descriptionMeeting?.[2] === "单") descriptionWeeks = descriptionWeeks.filter((week) => week % 2 === 1);
+  if (descriptionMeeting?.[2] === "双") descriptionWeeks = descriptionWeeks.filter((week) => week % 2 === 0);
+  const periodStart = numberValue(raw.KSJC ?? raw.ksjc)
+    ?? (keyMatch ? Number(keyMatch[2]) : descriptionMeeting ? Number(descriptionMeeting[4]) : undefined);
+  const periodEnd = numberValue(raw.JSJC ?? raw.jsjc)
+    ?? (descriptionMeeting ? Number(descriptionMeeting[5] ?? descriptionMeeting[4]) : periodStart);
   return {
     rwh: firstString(raw, ["RWH", "rwh"]),
     key,
@@ -118,14 +126,14 @@ export function normalisePersonalScheduleEntry(raw: Record<string, unknown>): Pe
     courseName: firstString(raw, ["KCMC", "kcmc", "KCWZSM", "kcwzsm", "name"])
       || description.split("\n")[0]?.trim()
       || "",
-    teacher: firstString(raw, ["SKJS", "DGJSMC", "dgjsmc", "teacher"]),
-    room: firstString(raw, ["SKDD", "JXDD", "JXCDMC", "room"]),
+    teacher: firstString(raw, ["SKJS", "DGJSMC", "dgjsmc", "teacher"]) || descriptionTeacher,
+    room: firstString(raw, ["SKDD", "JXDD", "JXCDMC", "room"]) || descriptionMeeting?.[3]?.trim() || "",
     description,
     descriptionEn: firstString(raw, ["SKSJ_EN", "sksj_en"]),
     ...(keyMatch ? { day: Number(keyMatch[1]) } : {}),
     ...(periodStart !== undefined ? { periodStart } : {}),
     ...(periodEnd !== undefined ? { periodEnd } : {}),
-    weeks: bitmapWeeks(weekBitmap),
+    weeks: weekBitmap ? bitmapWeeks(weekBitmap) : descriptionWeeks,
   };
 }
 

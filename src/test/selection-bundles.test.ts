@@ -71,3 +71,18 @@ test("raw selection records require the diagnostics-only envelope", () => {
   assert.equal(diagnostic.kind, "tis-selection-source-record");
   assert.equal(diagnostic.raw.unknownPersonalField, "not-for-default-json");
 });
+
+test("duplicate-component credit conflicts remain ambiguous in either source order", () => {
+  for (const creditBearing of [undefined, true]) {
+    const first = normaliseCourse({ bundleId: "X", id: "id-a", rwh: "task-a", kcdm: "X", kcmc: "X", xf: 2, creditBearing });
+    const second = normaliseCourse({ bundleId: "X", id: "id-a", rwh: "task-a", kcdm: "X", kcmc: "X", xf: 3, creditBearing });
+    for (const rows of [[first, second], [second, first]]) {
+      const bundle = bundleSelectionCourses(rows)[0]!;
+      assert.equal(bundle.components.length, 1);
+      assert.equal(bundle.credits, undefined);
+      assert.equal(bundle.creditStatus, "ambiguous");
+      assert.equal(bundle.components.some((component) => component.creditBearing), false);
+      assert.equal(bundle.selectableWithoutGuessing, false);
+    }
+  }
+});

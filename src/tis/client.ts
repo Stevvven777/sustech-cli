@@ -325,6 +325,10 @@ export class TisClient {
         courseId: input.courseId,
         rwh: input.rwh,
         round: input.round,
+        bid: input.bid,
+        semester: input.semester.value,
+        cultivation: input.cultivation,
+        where: "enrolled",
       });
     }
     return { clientRequestId, jg: stringValue(response.jg), message: stringValue(response.message) };
